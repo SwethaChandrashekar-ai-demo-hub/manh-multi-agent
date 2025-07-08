@@ -593,7 +593,52 @@ def get_billing_summary(params: CustomerIdParam) -> Dict[str, Any]:
     total_due = sum(item["outstanding"] for item in outstanding)  
     return {"customer_id": params.customer_id, "total_due": total_due, "invoices": outstanding}  
   
-  
+# ─── Azure AI ───────────────────────────────────────────────────── 
+class KBDocs(BaseModel):
+    id: Optional[str] = None
+    doc_id: Optional[str] = None
+    chunk_id: Optional[int] = None
+    name: Optional[str] = None
+    created_datetime: Optional[str] = None
+    size: Optional[int] = None
+    created_by: Optional[str] = None
+    last_modified_datetime: Optional[str] = None
+    last_modified_by: Optional[str] = None
+    source: Optional[str] = None
+    storage_path: Optional[str] = None
+    content: Optional[str] = None
+    summary: Optional[str] = None
+    file: Optional[str] = None
+    customer_code: Optional[str] = None
+    extension: Optional[str] = None
+    path: Optional[str] = None
+
+
+  # Azure Cognitive Search semantic search tool
+@mcp.tool(description="Semantic search on technical documents using Azure Cognitive Search AI")
+def search_knowledge_base_AI(params: KBSearchParams) -> List[KBDocs]:
+    results = search_client.search(
+        search_text=params.query,
+        top=params.topk or 3,
+        query_type="semantic",              # Enable semantic search
+        semantic_configuration_name="defaultSemanticConfig",  # Your semantic config name
+        query_language="en-us",
+    )
+   
+    docs = []
+    for result in results:
+        # result is dict-like object with search document fields
+        docs.append(
+            KBDocs(
+                extension=result.get("extension", ""),
+                content=result.get("content", ""),
+                summary=result.get("summary", ""),
+                file=result.get("file", ""),
+                customer_code=result.get("customer_code", ""),
+            )
+        )
+    return docs
+
 ##############################################################################  
 #                                RUN SERVER                                  #  
 ##############################################################################  
