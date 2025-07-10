@@ -33,7 +33,13 @@ class Agent(BaseAgent):
                 timeout=30,  
             )  
             tools = await mcp_server_tools(server_params)  
-  
+
+            server_params_atlassian = SseServerParams(  
+                url="http://localhost:8000/sse",  
+                headers={"Content-Type": "application/json"},  
+                timeout=30,  
+            )  
+            tools_atlassian = await mcp_server_tools(server_params) 
             model_client = AzureOpenAIChatCompletionClient(  
                 api_key=self.azure_openai_key,  
                 azure_endpoint=self.azure_openai_endpoint,  
@@ -42,27 +48,37 @@ class Agent(BaseAgent):
                 model=self.openai_model_name,  
             )  
   
-            primary_agent = AssistantAgent(  
-                name="primary",  
+            Azure_agent = AssistantAgent(  
+                name="AzureSearch",  
                 model_client=model_client,  
                 tools=tools,  
                 system_message=(  
-                    "You are a helpful assistant. You can use multiple tools to find information and answer questions. "  
-                    "Review the tools available to you and use them as needed. You can also ask clarifying questions if "  
-                    "the user is not clear."  
+                    "You are a helpful assistant that adds relevant context Azure AI Search to answer questions. You can use multiple tools to find information and answer questions."  
                 ),  
             )  
   
-            critic_agent = AssistantAgent(  
-                name="critic",  
+            Jira_agent = AssistantAgent(  
+                name="JiraAgent",  
                 model_client=model_client,  
-                tools=tools,  
-                system_message="Provide constructive feedback. Respond with 'APPROVE' when your feedbacks are addressed.",  
+                tools=tools_atlassian,  
+                system_message="You are a helpful assistant that answers questions related to Jira. You can use any tool to find information and answer questions. Do not ask clarifying questions",  
             )  
-  
-            termination_condition = TextMessageTermination("primary")  
+
+            Confulence_agent = AssistantAgent(  
+                name="ConfluenceAgent",  
+                model_client=model_client,  
+                tools=tools_atlassian,  
+                system_message="You are a helpful assistant that answers questions related to Confluence. You can use any tool to find information and answer questions. Do not ask clarifying questions",  
+            ) 
+
+            Final_agent = AssistantAgent(  
+                name="Master",  
+                model_client=model_client,  
+                # tools=[tools_atlassian, tools],  
+                system_message="You are a helpful assistant that lists all answers ConfluenceAgent, JiraAgent and AzureSearch and present to user.") 
+            termination_condition = TextMessageTermination("Master")  
             self.team_agent = RoundRobinGroupChat(  
-                [primary_agent, critic_agent],  
+                [Azure_agent, Jira_agent,Confulence_agent,Final_agent],  
                 termination_condition=termination_condition,  
             )  
   
